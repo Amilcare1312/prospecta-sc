@@ -1,6 +1,6 @@
 # Atualiza a base CNPJ de SC todo mês (a Receita publica a base mensalmente).
 # Configure o secret DATABASE_URL no repositório (Settings → Secrets → Actions).
-# Opcional: variáveis ETL_MUNICIPIOS e ETL_CNAE (Settings → Variables) para limitar o volume.
+# Cidades: padrão abaixo; para mudar, crie a variável ETL_MUNICIPIOS (Settings → Variables). ETL_CNAE é opcional.
 name: Atualizar base CNPJ (SC)
 on:
   schedule:
@@ -17,7 +17,7 @@ jobs:
       - run: pip install -r etl/requirements.txt
       - run: |
           python etl/carregar_cnpj_sc.py --apagar-zips \
-            ${{ vars.ETL_MUNICIPIOS && format('--municipios "{0}"', vars.ETL_MUNICIPIOS) || '' }} \
+            --municipios "${{ vars.ETL_MUNICIPIOS || 'SAO JOSE,FLORIANOPOLIS,PALHOCA,BIGUACU,BLUMENAU,TIMBO,INDAIAL,JOINVILLE' }}" \
             ${{ vars.ETL_CNAE && format('--cnae "{0}"', vars.ETL_CNAE) || '' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
