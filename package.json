@@ -1,0 +1,24 @@
+{
+  "name": "prospecta-sc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Micro SaaS de prospecção B2B em Santa Catarina: base CNPJ (Receita Federal) + Google Maps + CRM",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:schema": "node scripts/apply-schema.mjs"
+  },
+  "dependencies": {
+    "next": "^15.5.0",
+    "postgres": "^3.4.5",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "typescript": "^5.7.0"
+  }
+}

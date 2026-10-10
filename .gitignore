@@ -1,0 +1,9 @@
+node_modules
+.next
+.env
+.env.local
+dados-rfb
+*.zip
+__pycache__
+next-env.d.ts
+*.tsbuildinfo
