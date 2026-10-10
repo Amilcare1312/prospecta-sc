@@ -51,7 +51,7 @@ DATABASE_URL="postgresql://..." npm run db:schema
 ### 2. Carregar a base da Receita (SC)
 
 ```bash
-pip install -r etl/requirements.txt
+pip install "psycopg[binary]>=3.2" requests
 export DATABASE_URL="postgresql://..."
 
 # SC inteira: ativas e com algum contato (recomendado ter ≥ 1 GB de banco)

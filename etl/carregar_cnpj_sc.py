@@ -11,7 +11,7 @@ Fluxo
   4. Faz upsert em `empresas` sem apagar o enriquecimento (Google/site) já feito.
 
 Uso
-  pip install -r etl/requirements.txt
+  pip install "psycopg[binary]>=3.2" requests
   export DATABASE_URL="postgresql://usuario:senha@host/db?sslmode=require"
   python etl/carregar_cnpj_sc.py                       # baixa tudo e carrega SC (ativas, com contato)
   python etl/carregar_cnpj_sc.py --pasta ./zips        # usa zips já baixados
