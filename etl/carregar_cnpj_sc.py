@@ -217,16 +217,65 @@ def main():
     else:
         necessarios = [p.name for p in pasta.glob("*.zip")]
 
+    # Neon: para cargas longas, usa a conexão direta (sem o pooler "-pooler")
+    dsn_direto = dsn.replace("-pooler.", ".")
+    registrar(dsn_direto, "iniciado", "baixando arquivos da Receita")
+
+    # Baixa TUDO antes de abrir a conexão com o banco: downloads longos com a conexão
+    # parada derrubam a sessão (timeout de inatividade de rede/pooler).
+    try:
+        baixar_todos(args, mes, necessarios, pasta)
+    except Exception as e:
+        registrar(dsn_direto, "erro", f"download: {type(e).__name__}: {e}"[:2000])
+        raise
+
     def zips(prefixo):
         nomes = sorted(n for n in necessarios if n.lower().startswith(prefixo.lower()))
         for n in nomes:
-            yield baixar(mes, n, pasta) if not args.sem_download else pasta / n
+            caminho = pasta / n
+            if caminho.exists():
+                yield caminho
 
     uf = args.uf.upper()
     filtro_mun = {norm(m) for m in args.municipios.split(",") if m.strip()}
     filtro_cnae = tuple(digitos(c) for c in args.cnae.split(",") if digitos(c))
 
-    with psycopg.connect(dsn, autocommit=False) as con:
+    try:
+        carregar(args, dsn_direto, ref, uf, filtro_mun, filtro_cnae, zips)
+        registrar(dsn_direto, "ok", f"base {ref or '?'}")
+    except Exception as e:
+        registrar(dsn_direto, "erro", f"{type(e).__name__}: {e}"[:2000])
+        raise
+
+
+def baixar_todos(args, mes, necessarios, pasta):
+    if args.sem_download:
+        return
+    for prefixo in ("Municipios", "Cnaes", "Estabelecimentos", "Empresas"):
+        for n in sorted(x for x in necessarios if x.lower().startswith(prefixo.lower())):
+            baixar(mes, n, pasta)
+    print("Downloads concluídos.", flush=True)
+
+
+def conectar(dsn, **kw):
+    import psycopg
+    return psycopg.connect(dsn, keepalives=1, keepalives_idle=30, keepalives_interval=10,
+                           keepalives_count=6, connect_timeout=30, **kw)
+
+
+def registrar(dsn, status, mensagem):
+    """Grava o resultado da carga no banco (aparece no sistema)."""
+    try:
+        with conectar(dsn, autocommit=True) as c:
+            c.execute("""create table if not exists etl_execucoes (
+                id bigserial primary key, quando timestamptz default now(), status text, mensagem text)""")
+            c.execute("insert into etl_execucoes (status, mensagem) values (%s, %s)", (status, mensagem))
+    except Exception as e:  # noqa: BLE001
+        print("aviso: não consegui registrar o status:", e)
+
+
+def carregar(args, dsn, ref, uf, filtro_mun, filtro_cnae, zips):
+    with conectar(dsn, autocommit=False) as con:
         cur = con.cursor()
         schema = Path(__file__).resolve().parent.parent / "db" / "schema.sql"
         if schema.exists():  # garante que as tabelas existem

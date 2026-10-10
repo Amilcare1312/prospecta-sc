@@ -106,7 +106,7 @@ function Seletor<T>({
 }
 
 export default function Prospectar() {
-  const [meta, setMeta] = useState<{ municipios: Municipio[]; empresas: number; leads: number; ref_base: string | null; googleConfigurado: boolean } | null>(null);
+  const [meta, setMeta] = useState<{ municipios: Municipio[]; empresas: number; leads: number; ref_base: string | null; googleConfigurado: boolean; etl: { status: string; mensagem: string | null; quando: string } | null } | null>(null);
   const [f, setF] = useState<Filtro>(vazio);
   const [dados, setDados] = useState<{ linhas: Empresa[]; total: number; pagina: number; porPagina: number } | null>(null);
   const [pagina, setPagina] = useState(1);
@@ -220,9 +220,19 @@ export default function Prospectar() {
         )}
       </div>
 
-      {meta && meta.empresas === 0 && (
+      {meta && meta.etl?.status === 'iniciado' && (
         <div className="aviso" style={{ marginBottom: 14 }}>
-          A base está vazia. Rode o carregador da Receita Federal (<span className="mono">etl/carregar_cnpj_sc.py</span>) — veja o README.
+          Carga da base da Receita em andamento desde {new Date(meta.etl.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. Pode levar de 40 a 90 minutos — recarregue a página depois.
+        </div>
+      )}
+      {meta && meta.etl?.status === 'erro' && (
+        <div className="aviso" style={{ marginBottom: 14, background: 'var(--bad-soft)', color: 'var(--bad)' }}>
+          A última carga da base falhou ({new Date(meta.etl.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}): <span className="mono">{meta.etl.mensagem}</span>
+        </div>
+      )}
+      {meta && meta.empresas === 0 && !meta.etl && (
+        <div className="aviso" style={{ marginBottom: 14 }}>
+          A base está vazia. Rode a carga da Receita Federal (GitHub → Actions → "Atualizar base CNPJ (SC)" → Run workflow).
         </div>
       )}
 
