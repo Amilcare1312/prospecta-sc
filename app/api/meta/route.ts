@@ -7,7 +7,12 @@ export const dynamic = 'force-dynamic';
 
 export const GET = rota(async () => {
   const sql = db();
-  const municipios = await sql`select codigo, nome from municipios where uf = 'SC' order by nome`;
+  const municipios = await sql`
+    select m.codigo, m.nome, count(e.cnpj)::int as total
+    from municipios m join empresas e on e.municipio_codigo = m.codigo
+    where m.uf = 'SC'
+    group by m.codigo, m.nome
+    order by m.nome`;
   const [tot] = await sql`
     select (select count(*) from empresas)::int as empresas,
            (select count(*) from leads)::int as leads,

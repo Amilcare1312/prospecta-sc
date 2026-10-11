@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cnaeFormatado, cnpjFormatado, emailDeContador, formatarTelefone, linkWhatsapp, PORTES } from '@/lib/contato';
 import { api, fmtData, fmtN, Icone, toast } from './ui';
+import SeletorCidades from './SeletorCidades';
 
-type Municipio = { codigo: string; nome: string };
+type Municipio = { codigo: string; nome: string; total?: number };
 type Cnae = { codigo: string; descricao: string };
 type Empresa = Record<string, any>;
 
@@ -202,7 +203,6 @@ export default function Prospectar() {
   }
 
   const exportarHref = useMemo(() => `/api/empresas/export?${paraParams(filtroAplicado.current)}`, [dados]);
-  const munSelecionados = new Set(f.municipios.map((m) => m.codigo));
   const totalPaginas = dados ? Math.max(1, Math.ceil(dados.total / dados.porPagina)) : 1;
 
   return (
@@ -238,27 +238,30 @@ export default function Prospectar() {
 
       <form className="card pad" onSubmit={buscar} style={{ marginBottom: 14 }}>
         <div className="filtros">
-          <label className="campo">
-            Cidades
-            <Seletor<Municipio>
-              placeholder="Digite a cidade…"
-              buscar={(q) => {
-                const n = q.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
-                return (meta?.municipios || []).filter((m) => m.nome.includes(n) && !munSelecionados.has(m.codigo)).slice(0, 12);
-              }}
-              rotulo={(m) => m.nome}
-              onEscolher={(m) => set('municipios', [...f.municipios, m])}
-            />
-          </label>
+          <div className="campo">
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>Cidades</span>
+            <SeletorCidades cidades={meta?.municipios || []} selecionadas={f.municipios} onChange={(m) => set('municipios', m)} />
+          </div>
           <label className="campo col2">
             Atividade (CNAE)
             <Seletor<Cnae>
               placeholder="Ex.: metalúrgica, supermercado, 2512…"
               buscar={(q) => api<Cnae[]>(`/api/cnaes?q=${encodeURIComponent(q)}`).catch(() => [])}
               extra={(q) => (/^\d{2,7}$/.test(q.replace(/\D/g, '')) && q.replace(/[\d\s.\-/]/g, '') === ''
-                ? { codigo: q.replace(/\D/g, ''), descricao: `Todos os CNAEs que começam com ${q.replace(/\D/g, '')}` } : null)}
-              rotulo={(c) => <><span className="mono">{c.codigo.length === 7 ? cnaeFormatado(c.codigo) : c.codigo}</span> · {c.descricao}</>}
-              onEscolher={(c) => !f.cnaes.some((x) => x.codigo === c.codigo) && set('cnaes', [...f.cnaes, c])}
+                ? { codigo: q.replace(/\D/g, ''), descricao: `Todos os CNAEs que começam com ${q.replace(/\D/g, '')}` }
+                : q.length >= 3 ? { codigo: '*' + q, descricao: `Todas as atividades com “${q}”` } : null)}
+              rotulo={(c) => c.codigo.startsWith('*') ? <b>{c.descricao}</b> : <><span className="mono">{c.codigo.length === 7 ? cnaeFormatado(c.codigo) : c.codigo}</span> · {c.descricao}</>}
+              onEscolher={async (c) => {
+                if (c.codigo.startsWith('*')) {
+                  const todos = await api<Cnae[]>(`/api/cnaes?todos=1&q=${encodeURIComponent(c.codigo.slice(1))}`).catch(() => []);
+                  const novos = todos.filter((t) => !f.cnaes.some((x) => x.codigo === t.codigo));
+                  if (!novos.length) return toast('Nenhuma atividade encontrada com esse termo', true);
+                  setF((o) => ({ ...o, cnaes: [...o.cnaes, ...novos] }));
+                  toast(`${novos.length} atividade(s) adicionada(s)`);
+                  return;
+                }
+                if (!f.cnaes.some((x) => x.codigo === c.codigo)) set('cnaes', [...f.cnaes, c]);
+              }}
             />
           </label>
           <label className="campo">
