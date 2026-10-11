@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { COOKIE, verificar } from './lib/auth';
 
-const PUBLICAS = ['/login', '/cadastro', '/api/login', '/api/cadastro', '/api/webhooks/asaas'];
+const PUBLICAS = ['/login', '/cadastro', '/vendas', '/api/login', '/api/cadastro', '/api/webhooks/asaas'];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -10,7 +10,7 @@ export async function middleware(req: NextRequest) {
   if (t) return NextResponse.next();
   if (pathname.startsWith('/api/')) return NextResponse.json({ erro: 'Sessão expirada. Entre novamente.' }, { status: 401 });
   const url = req.nextUrl.clone();
-  url.pathname = '/login';
+  url.pathname = pathname === '/' ? '/vendas' : '/login';
   url.search = '';
   return NextResponse.redirect(url);
 }
