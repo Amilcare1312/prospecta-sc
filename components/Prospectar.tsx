@@ -348,7 +348,9 @@ export default function Prospectar() {
         <div className="barra">
           <div>
             {dados ? <><b>{fmtN(dados.total)}</b> <span className="muted">empresas</span></> : <span className="muted">Carregando…</span>}
-            {sel.size > 0 && <span className="badge acento" style={{ marginLeft: 10 }}>{sel.size} selecionada(s)</span>}
+            {sel.size > 0
+              ? <span className="badge acento" style={{ marginLeft: 10 }}>{sel.size} selecionada(s)</span>
+              : !!dados?.total && <span className="small muted" style={{ marginLeft: 10 }}>← marque as caixinhas das empresas para adicionar ao CRM</span>}
           </div>
           <div className="acoes">
             <select value={ordem} onChange={(e) => { setOrdem(e.target.value); carregar(filtroAplicado.current, 1, e.target.value); setPagina(1); }} style={{ width: 'auto' }} aria-label="Ordenar">
@@ -360,7 +362,7 @@ export default function Prospectar() {
               title={meta?.googleConfigurado ? 'Busca telefone, site e nota no Google Maps e e-mails/WhatsApp no site' : 'Configure GOOGLE_PLACES_API_KEY'}>
               {ocupado.startsWith('enriquecer') ? <><span className="spin" /> {ocupado.split(':')[1] || ''}</> : <><Icone n="raio" /> Enriquecer</>}
             </button>
-            <button className="btn acento" disabled={!sel.size || !!ocupado} onClick={adicionarSelecionados}>
+            <button className="btn acento" disabled={!sel.size || !!ocupado} onClick={adicionarSelecionados} title={sel.size ? '' : 'Marque as empresas na lista primeiro'}>
               <Icone n="mais" /> Adicionar ao CRM
             </button>
             <button className="btn" disabled={!dados?.total || !!ocupado} onClick={adicionarFiltro}>Adicionar filtro inteiro…</button>
