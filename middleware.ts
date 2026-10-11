@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { COOKIE, verificar } from './lib/auth';
 
-const PUBLICAS = ['/login', '/cadastro', '/api/login', '/api/cadastro'];
+const PUBLICAS = ['/login', '/cadastro', '/api/login', '/api/cadastro', '/api/webhooks/asaas'];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

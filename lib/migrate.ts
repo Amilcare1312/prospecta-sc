@@ -54,6 +54,25 @@ create unique index if not exists leads_conta_place_idx on leads (conta_id, goog
 create index if not exists leads_conta_etapa_idx on leads (conta_id, etapa);
 
 create index if not exists empresas_uf_idx on empresas (uf);
+
+-- cobrança (Asaas)
+alter table contas add column if not exists asaas_customer_id text;
+alter table contas add column if not exists asaas_subscription_id text;
+alter table contas add column if not exists asaas_ciclo text;
+create table if not exists pagamentos (
+  id          text primary key,              -- id do pagamento no Asaas
+  conta_id    bigint references contas(id) on delete set null,
+  assinatura  text,
+  valor       numeric,
+  status      text,
+  evento      text,
+  vencimento  date,
+  invoice_url text,
+  criado_em   timestamptz not null default now(),
+  atualizado_em timestamptz not null default now(),
+  creditado   boolean not null default false
+);
+create index if not exists pagamentos_conta_idx on pagamentos (conta_id, criado_em desc);
 `;
 
 const g = globalThis as unknown as { __migrado?: Promise<void> };

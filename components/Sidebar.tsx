@@ -17,7 +17,7 @@ export default function Sidebar() {
     { href: '/', label: 'Prospectar', icone: 'busca' },
     { href: '/google', label: 'Google Maps', icone: 'mapa' },
     { href: '/crm', label: 'CRM', icone: 'funil' },
-    ...(me?.papel === 'superadmin' ? [{ href: '/admin', label: 'Clientes', icone: 'pessoa' }] : []),
+    ...(me?.papel === 'superadmin' ? [{ href: '/admin', label: 'Clientes', icone: 'pessoa' }] : [{ href: '/assinatura', label: 'Assinatura', icone: 'calendario' }]),
   ];
   async function sair() {
     await api('/api/logout', { method: 'POST' }).catch(() => {});

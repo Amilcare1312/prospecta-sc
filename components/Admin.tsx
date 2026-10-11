@@ -1,11 +1,12 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { formatarTelefone, linkWhatsapp } from '@/lib/contato';
-import { api, fmtData, fmtN, Icone, toast } from './ui';
+import { api, fmtData, fmtN, fmtR$, Icone, toast } from './ui';
 
 type Conta = {
   id: number; nome: string; whatsapp: string | null; plano: string; ativo_ate: string | null; bloqueada: boolean;
   ufs: string | null; observacoes: string | null; criado_em: string; leads: number; google_mes: number | null;
+  asaas_subscription_id: string | null; asaas_ciclo: string | null; ultimo_pagamento: string | null; total_pago: number | string;
   usuarios: { nome: string; email: string; papel: string; ultimo_acesso: string | null }[] | null;
 };
 
@@ -83,6 +84,8 @@ export default function Admin() {
                         {Object.entries(PLANOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                       </select>
                       <div><span className={`badge ${st.cls}`}>{st.t}</span></div>
+                      {c.asaas_subscription_id && <div className="small" style={{ marginTop: 4, color: 'var(--ok)' }}>Renovação automática ({c.asaas_ciclo})</div>}
+                      {c.ultimo_pagamento && <div className="small muted">Último pagamento {fmtData(c.ultimo_pagamento)} · total {fmtR$(c.total_pago)}</div>}
                     </td>
                     <td className="small" style={{ minWidth: 120 }}>
                       <div>{fmtN(c.leads)} leads</div>

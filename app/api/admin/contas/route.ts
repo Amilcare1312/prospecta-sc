@@ -15,7 +15,9 @@ export const GET = rota(async () => {
       (select json_agg(json_build_object('nome', u.nome, 'email', u.email, 'papel', u.papel, 'ultimo_acesso', u.ultimo_acesso) order by u.id)
          from usuarios u where u.conta_id = c.id) as usuarios,
       (select count(*)::int from leads l where l.conta_id = c.id) as leads,
-      (select google from uso_mensal x where x.conta_id = c.id and x.mes = ${mes}) as google_mes
+      (select google from uso_mensal x where x.conta_id = c.id and x.mes = ${mes}) as google_mes,
+      (select max(p.criado_em) from pagamentos p where p.conta_id = c.id and p.creditado) as ultimo_pagamento,
+      (select coalesce(sum(p.valor), 0) from pagamentos p where p.conta_id = c.id and p.creditado) as total_pago
     from contas c
     order by c.criado_em desc`;
   return NextResponse.json({ contas, limiteGoogle: limiteGoogle() });

@@ -104,6 +104,13 @@ No GitHub: **Settings → Secrets → Actions → `DATABASE_URL`**. Opcional em 
 - Mais estados na base: variável `ETL_UFS` no GitHub (ex.: `SC,PR,RS` ou `BR`) e `ETL_MUNICIPIOS=*` para todas as cidades. Atenção ao tamanho do banco.
 - O banco é migrado automaticamente na primeira requisição depois do deploy.
 
+## Cobrança automática (Asaas)
+
+1. Crie a conta em asaas.com (comece pelo **sandbox** para testar sem dinheiro real).
+2. Gere a chave de API e configure `ASAAS_API_KEY`, `ASAAS_AMBIENTE`, `PRECO_MENSAL`, `PRECO_ANUAL`, `APP_URL` e `ASAAS_WEBHOOK_TOKEN`.
+3. No Asaas, em Integrações → Webhooks, cadastre `https://SEU-SITE/api/webhooks/asaas` com o mesmo token e os eventos de **cobrança** e **assinatura**.
+4. O cliente assina em **Assinatura** (PIX, boleto ou cartão). Ao confirmar o pagamento, o webhook soma 30 dias (mensal) ou 365 (anual) e libera a conta. Estorno retira os dias; cancelamento mantém o acesso até o fim do período pago.
+
 ## LGPD — boas práticas
 
 Os dados vêm de bases públicas e são de pessoas jurídicas, mas e-mails/telefones podem identificar pessoas (MEIs, sócios). Para prospecção B2B com base no legítimo interesse:
