@@ -190,7 +190,7 @@ def main():
     ap = argparse.ArgumentParser(description="Carrega empresas de SC da base CNPJ da Receita Federal")
     ap.add_argument("--pasta", default="dados-rfb", help="pasta dos .zip (baixa aqui se não existirem)")
     ap.add_argument("--sem-download", action="store_true", help="não baixa; usa só o que está na pasta")
-    ap.add_argument("--uf", default="SC")
+    ap.add_argument("--uf", default="SC", help="UF ou lista (ex.: 'SC,PR,RS'); 'BR' = todos os estados")
     ap.add_argument("--municipios", default="", help="nomes separados por vírgula (ex.: 'SAO JOSE,BLUMENAU')")
     ap.add_argument("--cnae", default="", help="prefixos de CNAE principal separados por vírgula (ex.: '10,25,2710')")
     ap.add_argument("--incluir-inativas", action="store_true", help="carrega também baixadas/inaptas/suspensas")
@@ -236,8 +236,10 @@ def main():
             if caminho.exists():
                 yield caminho
 
-    uf = args.uf.upper()
-    filtro_mun = {norm(m) for m in args.municipios.split(",") if m.strip()}
+    uf = {u.strip().upper() for u in args.uf.split(",") if u.strip()}
+    if "BR" in uf or "*" in uf:
+        uf = None  # todos os estados
+    filtro_mun = {norm(m) for m in args.municipios.split(",") if m.strip() and m.strip() != "*"}
     filtro_cnae = tuple(digitos(c) for c in args.cnae.split(",") if digitos(c))
 
     try:
@@ -312,7 +314,7 @@ def carregar(args, dsn, ref, uf, filtro_mun, filtro_cnae, zips):
         # 2) Estabelecimentos ---------------------------------------------------
         cur.execute(STG_ESTAB)
         basicos: set[str] = set()
-        municipios_vistos: set[str] = set()
+        municipios_vistos: dict[str, str] = {}
         total = 0
         for z in zips("Estabelecimentos"):
             t0, n = time.time(), 0
@@ -322,7 +324,7 @@ def carregar(args, dsn, ref, uf, filtro_mun, filtro_cnae, zips):
                 " uf, telefone1, telefone2, email, whatsapp) from stdin"
             ) as cp:
                 for r in ler_zip(z):
-                    if len(r) < 28 or r[19] != uf:
+                    if len(r) < 28 or (uf is not None and r[19] not in uf):
                         continue
                     if not args.incluir_inativas and r[5] != "02":
                         continue
@@ -342,10 +344,10 @@ def carregar(args, dsn, ref, uf, filtro_mun, filtro_cnae, zips):
                         r[20], r[19], t1, t2, email, whatsapp_de(t1) or whatsapp_de(t2),
                     ))
                     basicos.add(r[0])
-                    municipios_vistos.add(r[20])
+                    municipios_vistos[r[20]] = r[19]
                     n += 1
             total += n
-            print(f"{z.name}: {n:,} estabelecimentos de {uf} ({time.time() - t0:.0f}s)")
+            print(f"{z.name}: {n:,} estabelecimentos ({'BR' if uf is None else ','.join(sorted(uf))}) ({time.time() - t0:.0f}s)")
             if args.apagar_zips:
                 z.unlink()
         print(f"Total de estabelecimentos selecionados: {total:,}")
@@ -370,7 +372,7 @@ def carregar(args, dsn, ref, uf, filtro_mun, filtro_cnae, zips):
         cur.execute(UPSERT, {"ref": ref or None})
         print(f"  {cur.rowcount:,} linhas inseridas/atualizadas")
         if municipios_vistos:
-            cur.execute("update municipios set uf = %s where codigo = any(%s)", (uf, list(municipios_vistos)))
+            cur.executemany("update municipios set uf = %s where codigo = %s", [(u, c) for c, u in municipios_vistos.items()])
         con.commit()
     print("Concluído.")
 

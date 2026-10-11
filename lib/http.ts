@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { ErroHttp } from './sessao';
 
 export function erro(e: unknown, status = 500) {
+  if (e instanceof ErroHttp) return NextResponse.json({ erro: e.message, codigo: e.status }, { status: e.status });
   const msg = e instanceof Error ? e.message : String(e);
   console.error(msg);
   return NextResponse.json({ erro: msg }, { status });

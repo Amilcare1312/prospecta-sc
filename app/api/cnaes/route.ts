@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { digitos } from '@/lib/contato';
 import { rota } from '@/lib/http';
+import { sessao } from '@/lib/sessao';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,7 @@ function radicais(q: string) {
 }
 
 export const GET = rota(async (req: Request) => {
+  await sessao();
   const p = new URL(req.url).searchParams;
   const q = (p.get('q') || '').trim();
   const lim = p.get('todos') ? 300 : 30;

@@ -18,9 +18,10 @@ export default function GoogleBusca() {
   const [configurado, setConfigurado] = useState(true);
   const [termo, setTermo] = useState('');
   const [cidade, setCidade] = useState('');
+  const [ufPadrao, setUfPadrao] = useState('SC');
   const [lugares, setLugares] = useState<Lugar[]>([]);
   const [token, setToken] = useState<string | null>(null);
-  const [buscaAtual, setBuscaAtual] = useState<{ termo: string; cidade: string } | null>(null);
+  const [buscaAtual, setBuscaAtual] = useState<{ termo: string; cidade: string; uf: string } | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [buscarEmails, setBuscarEmails] = useState(true);
@@ -28,14 +29,17 @@ export default function GoogleBusca() {
 
   useEffect(() => {
     api('/api/meta').then((m) => {
-      setCidades(m.municipios.map((x: { nome: string }) => titulo(x.nome)));
+      const multi = (m.ufs?.length || 0) > 1;
+      setUfPadrao(m.ufs?.[0]?.uf || 'SC');
+      setCidades(m.municipios.map((x: { nome: string; uf: string }) => titulo(x.nome) + (multi ? ` - ${x.uf}` : '')));
       setConfigurado(m.googleConfigurado);
     }).catch(() => {});
   }, []);
 
   async function buscar(e?: React.FormEvent, mais = false) {
     e?.preventDefault();
-    const b = mais && buscaAtual ? buscaAtual : { termo, cidade };
+    const mUf = cidade.trim().match(/^(.*?)\s*-\s*([A-Za-z]{2})$/);
+    const b = mais && buscaAtual ? buscaAtual : { termo, cidade: mUf ? mUf[1] : cidade, uf: mUf ? mUf[2].toUpperCase() : ufPadrao };
     if (!b.termo.trim() || !b.cidade.trim()) return toast('Informe o que procurar e a cidade', true);
     setCarregando(true);
     try {
@@ -98,7 +102,7 @@ export default function GoogleBusca() {
             <datalist id="sugestoes-termo">{SUGESTOES.map((s) => <option key={s} value={s} />)}</datalist>
           </label>
           <label className="campo">
-            Cidade (SC)
+            Cidade
             <input type="search" value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Ex.: Blumenau" list="cidades-sc" />
             <datalist id="cidades-sc">{cidades.map((c) => <option key={c} value={c} />)}</datalist>
           </label>

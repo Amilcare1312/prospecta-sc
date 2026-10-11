@@ -2,6 +2,7 @@ import type postgres from 'postgres';
 import { digitos } from './contato';
 
 export type Filtro = {
+  ufs: string[];
   municipios: string[]; // códigos RFB
   cnaes: string[]; // prefixos (2 a 7 dígitos)
   secundario: boolean; // procura também nos CNAEs secundários
@@ -29,6 +30,7 @@ const bool = (v: string | null) => v === '1' || v === 'true';
 
 export function filtroDeParams(p: URLSearchParams): Filtro {
   return {
+    ufs: lista(p.get('ufs')).map((u) => u.toUpperCase()).filter((u) => /^[A-Z]{2}$/.test(u)),
     municipios: lista(p.get('municipios')),
     cnaes: lista(p.get('cnaes')).map(digitos).filter((c) => c.length >= 2),
     secundario: bool(p.get('secundario')),
@@ -59,9 +61,11 @@ export function filtroDeObjeto(o: Record<string, unknown>): Filtro {
 
 const CONTADOR_RE = 'contab|contador|contabil|contábil|escritorio|assessoria|^fiscal@|^dp@|^rh@';
 
-/** Monta o WHERE (alias da tabela empresas = e). */
-export function whereEmpresas(sql: postgres.Sql<Record<string, unknown>>, f: Filtro) {
+/** Monta o WHERE (alias da tabela empresas = e). `permitidas` = estados liberados para a conta (null = todos). */
+export function whereEmpresas(sql: postgres.Sql<Record<string, unknown>>, f: Filtro, contaId: number, permitidas: string[] | null = null) {
   const c: postgres.PendingQuery<postgres.Row[]>[] = [];
+  if (permitidas) c.push(sql`e.uf in ${sql(permitidas.length ? permitidas : ['--'])}`);
+  if (f.ufs.length) c.push(sql`e.uf in ${sql(f.ufs)}`);
   if (f.municipios.length) c.push(sql`e.municipio_codigo in ${sql(f.municipios)}`);
   if (f.cnaes.length) {
     const ors = f.cnaes.map((cn) =>
@@ -91,14 +95,14 @@ export function whereEmpresas(sql: postgres.Sql<Record<string, unknown>>, f: Fil
   if (f.desde) c.push(sql`e.data_inicio >= ${f.desde}`);
   if (f.ate) c.push(sql`e.data_inicio <= ${f.ate}`);
   if (f.capitalMin) c.push(sql`e.capital_social >= ${f.capitalMin}`);
-  if (f.foraCrm) c.push(sql`not exists (select 1 from leads l where l.cnpj = e.cnpj)`);
+  if (f.foraCrm) c.push(sql`not exists (select 1 from leads l where l.conta_id = ${contaId} and l.cnpj = e.cnpj)`);
   if (f.enriquecido === 'sim') c.push(sql`e.enriquecido_em is not null`);
   if (f.enriquecido === 'nao') c.push(sql`e.enriquecido_em is null`);
   return c.reduce((a, b) => sql`${a} and ${b}`, sql`true`);
 }
 
 /** Colunas padrão de empresa para listagem/exportação. */
-export function colunasEmpresa(sql: postgres.Sql<Record<string, unknown>>) {
+export function colunasEmpresa(sql: postgres.Sql<Record<string, unknown>>, contaId: number) {
   return sql`
     e.cnpj, e.razao_social, e.nome_fantasia, e.matriz, e.porte, e.capital_social, e.data_inicio,
     e.cnae_principal, c.descricao as cnae_descricao,
@@ -107,7 +111,7 @@ export function colunasEmpresa(sql: postgres.Sql<Record<string, unknown>>) {
     e.telefone1, e.telefone2, e.email, e.whatsapp,
     e.google_telefone, e.google_site, e.google_maps_url, e.google_rating, e.google_avaliacoes,
     e.site_emails, e.site_whatsapp, e.enriquecido_em, e.enriquecimento_status,
-    exists (select 1 from leads l where l.cnpj = e.cnpj) as em_crm`;
+    exists (select 1 from leads l where l.conta_id = ${contaId} and l.cnpj = e.cnpj) as em_crm`;
 }
 
 export function fromEmpresas(sql: postgres.Sql<Record<string, unknown>>) {

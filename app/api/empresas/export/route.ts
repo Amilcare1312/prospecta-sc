@@ -2,16 +2,18 @@ import { db } from '@/lib/db';
 import { cnaeFormatado, cnpjFormatado, formatarTelefone, PORTES } from '@/lib/contato';
 import { colunasEmpresa, filtroDeParams, fromEmpresas, whereEmpresas } from '@/lib/filtros';
 import { csv, rota } from '@/lib/http';
+import { sessao, ufsPermitidas } from '@/lib/sessao';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export const GET = rota(async (req: Request) => {
+  const s = await sessao();
   const p = new URL(req.url).searchParams;
   const f = filtroDeParams(p);
   const limite = Math.min(50000, Number(p.get('limite')) || 20000);
   const sql = db();
-  const rows = await sql`select ${colunasEmpresa(sql)} from ${fromEmpresas(sql)} where ${whereEmpresas(sql, f)}
+  const rows = await sql`select ${colunasEmpresa(sql, s.contaId)} from ${fromEmpresas(sql)} where ${whereEmpresas(sql, f, s.contaId, ufsPermitidas(s))}
     order by m.nome, e.razao_social limit ${limite}`;
   const linhas = rows.map((r: any) => ({
     ...r,

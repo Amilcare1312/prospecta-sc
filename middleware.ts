@@ -1,11 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { COOKIE, iguais, tokenEsperado } from './lib/auth';
+import { COOKIE, verificar } from './lib/auth';
+
+const PUBLICAS = ['/login', '/cadastro', '/api/login', '/api/cadastro'];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (pathname === '/login' || pathname === '/api/login') return NextResponse.next();
-  const c = req.cookies.get(COOKIE)?.value || '';
-  if (process.env.APP_PASSWORD && c && iguais(c, await tokenEsperado())) return NextResponse.next();
+  if (PUBLICAS.includes(pathname)) return NextResponse.next();
+  const t = await verificar(req.cookies.get(COOKIE)?.value).catch(() => null);
+  if (t) return NextResponse.next();
   if (pathname.startsWith('/api/')) return NextResponse.json({ erro: 'Sessão expirada. Entre novamente.' }, { status: 401 });
   const url = req.nextUrl.clone();
   url.pathname = '/login';

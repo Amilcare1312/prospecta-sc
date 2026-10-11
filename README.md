@@ -95,6 +95,15 @@ npm run dev                  # http://localhost:3000
 
 No GitHub: **Settings → Secrets → Actions → `DATABASE_URL`**. Opcional em **Variables**: `ETL_MUNICIPIOS` e `ETL_CNAE` com os mesmos filtros do passo 2. O workflow roda todo dia 20 (e pode ser disparado manualmente em *Actions*).
 
+## Contas de clientes (venda como assinatura)
+
+- Cada cliente cria a conta em **/cadastro** e ganha **TESTE_DIAS** (padrão 7) de teste. O CRM de cada conta é separado.
+- O administrador entra com e-mail **admin** (ou `ADMIN_EMAIL`) e a senha `APP_PASSWORD`, e vê a tela **Clientes**: liberar +7/+30 dias ou +1 ano, trocar plano, bloquear e limitar estados (ex.: `SC,PR`).
+- Conta vencida continua vendo a tela, mas não consulta nada até ser renovada; os leads ficam guardados.
+- Consultas ao Google têm limite mensal por conta (`GOOGLE_LIMITE_MENSAL`). Empresas enriquecidas nos últimos 90 dias são reaproveitadas sem novo custo.
+- Mais estados na base: variável `ETL_UFS` no GitHub (ex.: `SC,PR,RS` ou `BR`) e `ETL_MUNICIPIOS=*` para todas as cidades. Atenção ao tamanho do banco.
+- O banco é migrado automaticamente na primeira requisição depois do deploy.
+
 ## LGPD — boas práticas
 
 Os dados vêm de bases públicas e são de pessoas jurídicas, mas e-mails/telefones podem identificar pessoas (MEIs, sócios). Para prospecção B2B com base no legítimo interesse:

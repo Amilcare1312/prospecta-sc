@@ -1,11 +1,13 @@
 import { db } from '@/lib/db';
 import { cnpjFormatado, ETAPAS, formatarTelefone, PORTES } from '@/lib/contato';
 import { csv, rota } from '@/lib/http';
+import { sessao } from '@/lib/sessao';
 
 export const dynamic = 'force-dynamic';
 
 export const GET = rota(async () => {
-  const rows = await db()`select * from leads order by etapa, nome`;
+  const s = await sessao();
+  const rows = await db()`select * from leads where conta_id = ${s.contaId} order by etapa, nome`;
   const nomeEtapa = Object.fromEntries(ETAPAS.map((e) => [e.id, e.nome]));
   const linhas = rows.map((r: any) => ({
     ...r,

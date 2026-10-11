@@ -4,7 +4,7 @@ import { cnaeFormatado, cnpjFormatado, emailDeContador, formatarTelefone, linkWh
 import { api, fmtData, fmtN, Icone, toast } from './ui';
 import SeletorCidades from './SeletorCidades';
 
-type Municipio = { codigo: string; nome: string; total?: number };
+type Municipio = { codigo: string; nome: string; total?: number; uf?: string };
 type Cnae = { codigo: string; descricao: string };
 type Empresa = Record<string, any>;
 
@@ -22,6 +22,7 @@ const PRESETS: { nome: string; cnaes: Cnae[] }[] = [
 ];
 
 const vazio = {
+  uf: '',
   municipios: [] as Municipio[],
   cnaes: [] as Cnae[],
   secundario: false,
@@ -42,6 +43,7 @@ type Filtro = typeof vazio;
 
 function paraParams(f: Filtro) {
   const p = new URLSearchParams();
+  if (f.uf) p.set('ufs', f.uf);
   if (f.municipios.length) p.set('municipios', f.municipios.map((m) => m.codigo).join(','));
   if (f.cnaes.length) p.set('cnaes', f.cnaes.map((c) => c.codigo).join(','));
   if (f.portes.length) p.set('portes', f.portes.join(','));
@@ -107,7 +109,7 @@ function Seletor<T>({
 }
 
 export default function Prospectar() {
-  const [meta, setMeta] = useState<{ municipios: Municipio[]; empresas: number; leads: number; ref_base: string | null; googleConfigurado: boolean; etl: { status: string; mensagem: string | null; quando: string } | null } | null>(null);
+  const [meta, setMeta] = useState<{ municipios: Municipio[]; ufs: { uf: string; total: number }[]; empresas: number; leads: number; ref_base: string | null; googleConfigurado: boolean; etl: { status: string; mensagem: string | null; quando: string } | null } | null>(null);
   const [f, setF] = useState<Filtro>(vazio);
   const [dados, setDados] = useState<{ linhas: Empresa[]; total: number; pagina: number; porPagina: number } | null>(null);
   const [pagina, setPagina] = useState(1);
@@ -203,6 +205,10 @@ export default function Prospectar() {
   }
 
   const exportarHref = useMemo(() => `/api/empresas/export?${paraParams(filtroAplicado.current)}`, [dados]);
+  const variosEstados = (meta?.ufs?.length || 0) > 1;
+  const cidadesVisiveis = (meta?.municipios || [])
+    .filter((m) => !f.uf || m.uf === f.uf)
+    .map((m) => (variosEstados && !f.uf ? { ...m, nome: `${m.nome} - ${m.uf}` } : m));
   const totalPaginas = dados ? Math.max(1, Math.ceil(dados.total / dados.porPagina)) : 1;
 
   return (
@@ -210,7 +216,7 @@ export default function Prospectar() {
       <div className="topo">
         <div>
           <h1>Prospectar empresas</h1>
-          <div className="muted small">Base CNPJ da Receita Federal — Santa Catarina{meta?.ref_base ? ` · referência ${meta.ref_base}` : ''}</div>
+          <div className="muted small">Base CNPJ da Receita Federal{meta?.ufs?.length === 1 ? ` — ${meta.ufs[0].uf}` : ''}{meta?.ref_base ? ` · referência ${meta.ref_base}` : ''}</div>
         </div>
         {meta && (
           <div className="stats">
@@ -238,9 +244,18 @@ export default function Prospectar() {
 
       <form className="card pad" onSubmit={buscar} style={{ marginBottom: 14 }}>
         <div className="filtros">
+          {(meta?.ufs?.length || 0) > 1 && (
+            <label className="campo">
+              Estado
+              <select value={f.uf} onChange={(e) => setF((o) => ({ ...o, uf: e.target.value, municipios: e.target.value ? o.municipios.filter((m) => m.uf === e.target.value) : o.municipios }))}>
+                <option value="">Todos os estados</option>
+                {meta!.ufs.map((u) => <option key={u.uf} value={u.uf}>{u.uf} · {fmtN(u.total)} empresas</option>)}
+              </select>
+            </label>
+          )}
           <div className="campo">
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>Cidades</span>
-            <SeletorCidades cidades={meta?.municipios || []} selecionadas={f.municipios} onChange={(m) => set('municipios', m)} />
+            <SeletorCidades cidades={cidadesVisiveis} selecionadas={f.municipios} onChange={(m) => set('municipios', m)} />
           </div>
           <label className="campo col2">
             Atividade (CNAE)

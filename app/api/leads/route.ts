@@ -4,6 +4,7 @@ import { digitos, ETAPA_IDS, semAcento, whatsappDe } from '@/lib/contato';
 import { filtroDeObjeto, whereEmpresas } from '@/lib/filtros';
 import { rota } from '@/lib/http';
 import { contatosDoSite, emLotes } from '@/lib/site';
+import { sessao, ufsPermitidas } from '@/lib/sessao';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -11,6 +12,7 @@ export const maxDuration = 60;
 const CONTADOR = 'contab|contador|contabil|contábil|escritorio|assessoria|^fiscal@|^dp@|^rh@';
 
 export const GET = rota(async (req: Request) => {
+  const s = await sessao();
   const p = new URL(req.url).searchParams;
   const q = (p.get('q') || '').trim();
   const cidade = (p.get('cidade') || '').trim();
@@ -19,18 +21,18 @@ export const GET = rota(async (req: Request) => {
     select id, cnpj, nome, cidade, telefone, whatsapp, email, site, segmento, porte, origem, etapa, valor,
            responsavel, proximo_contato, nao_contatar, atualizado_em
     from leads
-    where true
+    where conta_id = ${s.contaId}
       ${q ? sql`and (nome ilike ${'%' + q + '%'} or razao_social ilike ${'%' + q + '%'} or email ilike ${'%' + q + '%'} or cnpj like ${digitos(q) + '%'})` : sql``}
       ${cidade ? sql`and cidade = ${cidade}` : sql``}
     order by proximo_contato asc nulls last, atualizado_em desc
     limit 3000`;
-  const cidades = await sql`select distinct cidade from leads where cidade is not null order by cidade`;
+  const cidades = await sql`select distinct cidade from leads where conta_id = ${s.contaId} and cidade is not null order by cidade`;
   return NextResponse.json({ leads, cidades: cidades.map((c: any) => c.cidade) });
 });
 
 type LugarIn = {
   place_id: string; nome: string; endereco?: string | null; telefone?: string | null; site?: string | null;
-  cidade?: string | null; cnpj?: string | null; tipo?: string | null; email_receita?: string | null;
+  cidade?: string | null; uf?: string | null; cnpj?: string | null; tipo?: string | null; email_receita?: string | null;
 };
 
 export const POST = rota(async (req: Request) => {
@@ -41,13 +43,15 @@ export const POST = rota(async (req: Request) => {
     lugares?: LugarIn[];
     buscarEmails?: boolean;
   };
+  const s = await sessao();
+  const permitidas = ufsPermitidas(s);
   const sql = db();
   let inseridos = 0;
 
   const insertSelect = (where: any, limite: number) => sql`
-    insert into leads (cnpj, google_place_id, nome, razao_social, cidade, uf, endereco, telefone, telefone2,
+    insert into leads (conta_id, cnpj, google_place_id, nome, razao_social, cidade, uf, endereco, telefone, telefone2,
                        whatsapp, email, site, segmento, porte, origem)
-    select e.cnpj, e.google_place_id, coalesce(nullif(e.nome_fantasia, ''), e.razao_social), e.razao_social,
+    select ${s.contaId}, e.cnpj, e.google_place_id, coalesce(nullif(e.nome_fantasia, ''), e.razao_social), e.razao_social,
       initcap(m.nome), e.uf,
       concat_ws(', ', nullif(concat_ws(' ', e.tipo_logradouro, e.logradouro, e.numero), ''), nullif(e.complemento, ''),
                 nullif(e.bairro, ''), case when e.cep is not null then 'CEP ' || e.cep end),
@@ -59,18 +63,18 @@ export const POST = rota(async (req: Request) => {
     from empresas e
       left join municipios m on m.codigo = e.municipio_codigo
       left join cnaes c on c.codigo = e.cnae_principal
-    where ${where} and not exists (select 1 from leads l where l.cnpj = e.cnpj)
+    where ${where} and not exists (select 1 from leads l where l.conta_id = ${s.contaId} and l.cnpj = e.cnpj)
     limit ${limite}
     on conflict do nothing`;
 
   if (body.cnpjs?.length) {
     const lista = body.cnpjs.map(digitos).filter((c) => c.length === 14).slice(0, 2000);
-    if (lista.length) inseridos += (await insertSelect(sql`e.cnpj in ${sql(lista)}`, lista.length)).count;
+    if (lista.length) inseridos += (await insertSelect(sql`e.cnpj in ${sql(lista)} and ${whereEmpresas(sql, filtroDeObjeto({}), s.contaId, permitidas)}`, lista.length)).count;
   }
 
   if (body.filtro) {
     const limite = Math.min(2000, Math.max(1, Number(body.limite) || 200));
-    inseridos += (await insertSelect(whereEmpresas(sql, filtroDeObjeto(body.filtro)), limite)).count;
+    inseridos += (await insertSelect(whereEmpresas(sql, filtroDeObjeto(body.filtro), s.contaId, permitidas), limite)).count;
   }
 
   if (body.lugares?.length) {
@@ -83,8 +87,8 @@ export const POST = rota(async (req: Request) => {
       const ex = extras[i];
       const cnpj = l.cnpj && digitos(l.cnpj).length === 14 ? digitos(l.cnpj) : null;
       const r = await sql`
-        insert into leads (cnpj, google_place_id, nome, cidade, endereco, telefone, whatsapp, email, site, segmento, origem)
-        values (${cnpj}, ${l.place_id}, ${l.nome}, initcap(${l.cidade ? semAcento(l.cidade) : null}), ${l.endereco ?? null}, ${digitos(l.telefone) || null},
+        insert into leads (conta_id, cnpj, google_place_id, nome, cidade, uf, endereco, telefone, whatsapp, email, site, segmento, origem)
+        values (${s.contaId}, ${cnpj}, ${l.place_id}, ${l.nome}, initcap(${l.cidade ? semAcento(l.cidade) : null}), ${l.uf || 'SC'}, ${l.endereco ?? null}, ${digitos(l.telefone) || null},
                 ${ex.whatsapp || whatsappDe(l.telefone) || null}, ${ex.emails[0] || l.email_receita || null}, ${l.site ?? null},
                 ${l.tipo ?? null}, 'google')
         on conflict do nothing`;

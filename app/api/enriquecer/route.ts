@@ -4,20 +4,39 @@ import { digitos, whatsappDe } from '@/lib/contato';
 import { rota } from '@/lib/http';
 import { localizarEmpresa, placesConfigurado } from '@/lib/places';
 import { contatosDoSite, emLotes } from '@/lib/site';
+import { sessao, ufsPermitidas } from '@/lib/sessao';
+import { consumirGoogle } from '@/lib/uso';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /** Enriquecimento: Google Maps (telefone, site, nota) + e-mails/WhatsApp do site. Máx. 20 por chamada. */
 export const POST = rota(async (req: Request) => {
+  const s = await sessao();
   if (!placesConfigurado()) return NextResponse.json({ erro: 'Configure GOOGLE_PLACES_API_KEY para enriquecer.' }, { status: 400 });
   const { cnpjs } = (await req.json()) as { cnpjs: string[] };
   const lista = [...new Set((cnpjs || []).map(digitos).filter((c) => c.length === 14))].slice(0, 20);
   const sql = db();
-  const empresas = await sql`
-    select e.cnpj, coalesce(nullif(e.nome_fantasia, ''), e.razao_social) as nome, e.razao_social, e.cep, m.nome as cidade
+  const permitidas = ufsPermitidas(s);
+  const todas = await sql`
+    select e.cnpj, coalesce(nullif(e.nome_fantasia, ''), e.razao_social) as nome, e.razao_social, e.cep, m.nome as cidade,
+           e.enriquecido_em, e.enriquecimento_status
     from empresas e left join municipios m on m.codigo = e.municipio_codigo
-    where e.cnpj in ${sql(lista.length ? lista : [''])}`;
+    where e.cnpj in ${sql(lista.length ? lista : [''])}
+      ${permitidas ? sql`and e.uf in ${sql(permitidas.length ? permitidas : ['--'])}` : sql``}`;
+  // Enriquecimento é compartilhado: o que já foi consultado nos últimos 90 dias não gasta Google de novo.
+  const recente = (e: any) => e.enriquecido_em && e.enriquecimento_status !== 'erro' && Date.now() - new Date(e.enriquecido_em).getTime() < 90 * 86400000;
+  const empresas = todas.filter((e) => !recente(e));
+  const emCache = todas.filter(recente);
+  if (empresas.length) await consumirGoogle(s, empresas.length);
+  for (const e of emCache as any[]) {
+    await sql`update leads l set
+        telefone = coalesce(nullif(l.telefone, ''), x.google_telefone),
+        whatsapp = coalesce(nullif(l.whatsapp, ''), x.site_whatsapp),
+        email = coalesce(nullif(l.email, ''), nullif(split_part(x.site_emails, ',', 1), '')),
+        site = coalesce(nullif(l.site, ''), x.google_site), atualizado_em = now()
+      from empresas x where x.cnpj = l.cnpj and l.cnpj = ${e.cnpj} and l.conta_id = ${s.contaId}`;
+  }
 
   const resultados = await emLotes(empresas as any[], 4, async (e) => {
     try {
@@ -41,12 +60,13 @@ export const POST = rota(async (req: Request) => {
           email = coalesce(nullif(email, ''), ${site.emails[0] ?? null}),
           site = coalesce(nullif(site, ''), ${lugar?.site ?? null}),
           atualizado_em = now()
-        where cnpj = ${e.cnpj}`;
+        where cnpj = ${e.cnpj} and conta_id = ${s.contaId}`;
       return { cnpj: e.cnpj, status: lugar ? 'ok' : 'nao_encontrado' };
     } catch (err) {
       await sql`update empresas set enriquecimento_status = 'erro', enriquecido_em = now() where cnpj = ${e.cnpj}`;
       return { cnpj: e.cnpj, status: 'erro', erro: err instanceof Error ? err.message : String(err) };
     }
   });
+  for (const e of emCache as any[]) resultados.push({ cnpj: e.cnpj, status: e.enriquecimento_status || 'ok' });
   return NextResponse.json({ resultados });
 });
