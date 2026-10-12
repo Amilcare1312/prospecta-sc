@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { api, Icone } from '@/components/ui';
+import { rastrear } from '@/lib/pixel';
 
 export default function Cadastro() {
   const [f, setF] = useState({ nome: '', empresa: '', email: '', whatsapp: '', senha: '' });
@@ -13,7 +14,10 @@ export default function Cadastro() {
     setCarregando(true);
     setErro('');
     try {
-      await api('/api/cadastro', { method: 'POST', json: f });
+      const r = await api<{ eventoId?: string }>('/api/cadastro', { method: 'POST', json: f });
+      rastrear('CompleteRegistration', { content_name: 'Teste grátis' }, r.eventoId);
+      rastrear('StartTrial', { currency: 'BRL', value: 0 });
+      await new Promise((ok) => setTimeout(ok, 400)); // dá tempo do evento sair
       window.location.href = '/';
     } catch (err) {
       setErro((err as Error).message);

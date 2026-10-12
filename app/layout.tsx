@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import MetaPixel from '@/components/MetaPixel';
 import { Toasts } from '@/components/ui';
 
 export const metadata: Metadata = {
@@ -14,6 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <Toasts />
+        <MetaPixel />
       </body>
     </html>
   );

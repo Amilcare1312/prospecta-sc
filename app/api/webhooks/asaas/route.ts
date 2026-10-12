@@ -3,6 +3,7 @@ import { diasDoCiclo, precos } from '@/lib/asaas';
 import { iguais } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { garantirSchema } from '@/lib/migrate';
+import { enviarEventoMeta } from '@/lib/meta-capi';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +65,16 @@ export async function POST(req: Request) {
             ativo_ate = greatest(coalesce(ativo_ate, now()), now()) + make_interval(days => ${dias}),
             plano = ${ciclo}, bloqueada = false
           where id = ${conta.id as number}`;
+        const [dono] = await sql`
+          select u.email, c.whatsapp, c.meta_fbp, c.meta_fbc from contas c
+          left join usuarios u on u.conta_id = c.id and u.papel = 'dono'
+          where c.id = ${conta.id as number} limit 1`;
+        await enviarEventoMeta({
+          nome: 'Purchase', id: `pagamento-${p.id}`, valor: Number(p.value) || 0,
+          url: `${process.env.APP_URL || ''}/assinatura`,
+          usuario: { email: dono?.email as string, telefone: dono?.whatsapp as string, externalId: conta.id as number,
+            fbp: dono?.meta_fbp as string, fbc: dono?.meta_fbc as string },
+        });
       }
     }
     if (conta && ESTORNO.includes(evento)) {

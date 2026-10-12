@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { linkWhatsapp } from '@/lib/contato';
+import { rastrear } from '@/lib/pixel';
 import { api, fmtData, fmtR$, Icone, toast } from './ui';
 
 type Dados = {
@@ -31,6 +32,7 @@ export default function Assinatura() {
 
   async function assinar(ciclo: 'mensal' | 'anual') {
     setOcupado(ciclo);
+    rastrear('InitiateCheckout', { currency: 'BRL', value: (ciclo === 'anual' ? d?.precos.anual : d?.precos.mensal) || 0, content_name: `Plano ${ciclo}` });
     try {
       const r = await api<{ url: string }>('/api/assinatura', { method: 'POST', json: { ciclo, cpfCnpj: doc || undefined } });
       window.location.href = r.url;

@@ -59,6 +59,8 @@ create index if not exists empresas_uf_idx on empresas (uf);
 alter table contas add column if not exists asaas_customer_id text;
 alter table contas add column if not exists asaas_subscription_id text;
 alter table contas add column if not exists asaas_ciclo text;
+alter table contas add column if not exists meta_fbp text;
+alter table contas add column if not exists meta_fbc text;
 create table if not exists pagamentos (
   id          text primary key,              -- id do pagamento no Asaas
   conta_id    bigint references contas(id) on delete set null,

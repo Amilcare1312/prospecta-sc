@@ -5,6 +5,8 @@ import { rota } from '@/lib/http';
 import { garantirSchema } from '@/lib/migrate';
 import { respostaComSessao } from '@/lib/resposta-sessao';
 import { hashSenha } from '@/lib/senha';
+import { enviarEventoMeta } from '@/lib/meta-capi';
+import { cookies, headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,10 +36,13 @@ export const POST = rota(async (req: Request) => {
   const dias = Math.max(0, Number(process.env.TESTE_DIAS ?? 7) || 0);
   const ufs = (process.env.UFS_TESTE || '').trim() || null;
   const h = await hashSenha(senha);
+  const ck = await cookies();
+  const fbp = ck.get('_fbp')?.value || null;
+  const fbc = ck.get('_fbc')?.value || null;
   const u = await sql.begin(async (tx) => {
     const [c] = await tx`
-      insert into contas (nome, whatsapp, plano, ativo_ate, ufs)
-      values (${empresa}, ${whatsapp}, 'teste', now() + make_interval(days => ${dias}), ${ufs})
+      insert into contas (nome, whatsapp, plano, ativo_ate, ufs, meta_fbp, meta_fbc)
+      values (${empresa}, ${whatsapp}, 'teste', now() + make_interval(days => ${dias}), ${ufs}, ${fbp}, ${fbc})
       returning id`;
     const [u] = await tx`
       insert into usuarios (conta_id, nome, email, senha_hash, papel)
@@ -45,5 +50,12 @@ export const POST = rota(async (req: Request) => {
       returning id, conta_id, papel`;
     return u;
   });
-  return respostaComSessao(u as any, { ok: true, dias });
+  const eventoId = `cadastro-${u.conta_id}`;
+  const hd = await headers();
+  await enviarEventoMeta({
+    nome: 'CompleteRegistration', id: eventoId, url: `${process.env.APP_URL || new URL(req.url).origin}/cadastro`,
+    usuario: { email, telefone: whatsapp, externalId: u.conta_id as number, fbp, fbc,
+      ip: (hd.get('x-forwarded-for') || '').split(',')[0].trim() || null, ua: hd.get('user-agent') },
+  });
+  return respostaComSessao(u as any, { ok: true, dias, eventoId });
 });
