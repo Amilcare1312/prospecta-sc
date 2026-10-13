@@ -40,7 +40,8 @@ export default function GoogleBusca() {
     e?.preventDefault();
     const mUf = cidade.trim().match(/^(.*?)\s*-\s*([A-Za-z]{2})$/);
     const b = mais && buscaAtual ? buscaAtual : { termo, cidade: mUf ? mUf[1] : cidade, uf: mUf ? mUf[2].toUpperCase() : ufPadrao };
-    if (!b.termo.trim() || !b.cidade.trim()) return toast('Informe o que procurar e a cidade', true);
+    if (!b.termo.trim()) return toast('Informe o que procurar (ex.: hotel)', true);
+    if (!b.cidade.trim()) return toast('Escolha a cidade no campo "Cidade"', true);
     setCarregando(true);
     try {
       const r = await api('/api/google/buscar', { method: 'POST', json: { ...b, pageToken: mais ? token : undefined } });
